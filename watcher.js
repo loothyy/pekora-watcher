@@ -245,58 +245,58 @@ function setupExpressServer() {
       if (response.status === 200 && response.data) {
         const html = response.data;
         
-        // Extract username - matches <h2 class="username-...">ROBLOX <span... (ignores span/div after)
+        // Extract username from the page - handle icons and extra spaces
         let username = 'Unknown';
         const usernameMatch = html.match(/<h2\s+class="username[^"]*"[^>]*>([^<]+?)(?=\s*<span|<div|<p)/i);
         if (usernameMatch) {
           username = usernameMatch[1].trim().replace(/\s+/g, ' ');
         }
         
-        // Extract user status - matches <p class="userStatus-...">"Status text"</p>
+        // Extract user status
         let status = '';
         const statusMatch = html.match(/<p\s+class="userStatus[^"]*"[^>]*>(["']?)(.*?)\1<\/p>/i);
         if (statusMatch) {
-          status = statusMatch[2].trim().replace(/^["']|["']$/g, ''); // Strip surrounding quotes
+          status = statusMatch[2].trim().replace(/^["']|["']$/g, '');
         }
         
-        // Extract description/about - matches <p class="body-...">Multi-line text</p>
+        // Extract description/about - handle multiline
         let description = '';
         const descMatch = html.match(/<p\s+class="body[^"]*"[^>]*>([\s\S]*?)<\/p>/i);
         if (descMatch) {
-          description = descMatch[1].replace(/<[^>]*>/g, '').trim(); // Strip any inner tags
+          description = descMatch[1].replace(/<[^>]*>/g, '').trim();
         }
         
-        // Extract Friends - after "Friends" div, find the <h3 class="statText-...">value</h3>
+        // Extract Friends - find the number after "Friends</div>"
         let friends = '0';
-        const friendsMatch = html.match(/Friends<\/div>[\s\S]*?<h3\s+class="statText[^"]*"[^>]*>([^<]+?)<\/h3>/i);
+        const friendsMatch = html.match(/Friends<\/div>[\s\S]*?<h3\s+class="statText[^"]*"[^>]*>([^<]+)<\/h3>/i);
         if (friendsMatch) {
           friends = friendsMatch[1].trim();
         }
         
-        // Extract Followers - similar pattern
+        // Extract Followers
         let followers = '0';
-        const followersMatch = html.match(/Followers<\/div>[\s\S]*?<h3\s+class="statText[^"]*"[^>]*>([^<]+?)<\/h3>/i);
+        const followersMatch = html.match(/Followers<\/div>[\s\S]*?<h3\s+class="statText[^"]*"[^>]*>([^<]+)<\/h3>/i);
         if (followersMatch) {
           followers = followersMatch[1].trim();
         }
         
-        // Extract Following - similar pattern
+        // Extract Following
         let following = '0';
-        const followingMatch = html.match(/Following<\/div>[\s\S]*?<h3\s+class="statText[^"]*"[^>]*>([^<]+?)<\/h3>/i);
+        const followingMatch = html.match(/Following<\/div>[\s\S]*?<h3\s+class="statText[^"]*"[^>]*>([^<]+)<\/h3>/i);
         if (followingMatch) {
           following = followingMatch[1].trim();
         }
         
-        // Extract RAP - similar pattern
+        // Extract RAP
         let rap = '0';
-        const rapMatch = html.match(/RAP<\/div>[\s\S]*?<h3\s+class="statText[^"]*"[^>]*>([^<]+?)<\/h3>/i);
+        const rapMatch = html.match(/RAP<\/div>[\s\S]*?<h3\s+class="statText[^"]*"[^>]*>([^<]+)<\/h3>/i);
         if (rapMatch) {
           rap = rapMatch[1].trim();
         }
         
-        // Extract Place Visits - in statistics: after "Place Visits" <p class="label-...">, next <p class="value-...">value</p>
+        // Extract place visits from Statistics section
         let placeVisits = '0';
-        const visitsMatch = html.match(/Place\s+Visits<\/p>[\s\S]*?<p\s+class="value[^"]*"[^>]*>([^<]+?)<\/p>/i);
+        const visitsMatch = html.match(/Place\s+Visits<\/p>[\s\S]*?<p\s+class="value[^"]*"[^>]*>([^<]+)<\/p>/i);
         if (visitsMatch) {
           placeVisits = visitsMatch[1].trim();
         }
