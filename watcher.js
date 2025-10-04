@@ -220,7 +220,7 @@ function setupExpressServer() {
     });
   });
 
-  // Proxy endpoint for user lookups
+  // Proxy endpoint for user lookups by ID
   app.get('/users/:id', async (req, res) => {
     const userId = parseInt(req.params.id);
 
@@ -264,6 +264,49 @@ function setupExpressServer() {
       
       return res.status(500).json({
         error: 'Failed to fetch user data'
+      });
+    }
+  });
+
+  // Search by username endpoint
+  app.get('/search/:username', async (req, res) => {
+    const username = req.params.username;
+
+    if (!username || username.length < 1) {
+      return res.status(400).json({
+        error: 'Invalid username'
+      });
+    }
+
+    try {
+      // Pekora.zip doesn't have a direct username search, so we'll need to check the API
+      // If there's a search endpoint, use it. Otherwise, return error.
+      const response = await axios.get(`https://www.pekora.zip/users/search/${username}`, {
+        timeout: REQUEST_TIMEOUT,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; PekoraWatcher/1.0)'
+        },
+        validateStatus: function (status) {
+          return status === 200 || status === 404 || status === 401 || status === 400;
+        }
+      });
+
+      if (response.status === 200 && response.data) {
+        return res.json({
+          Id: response.data.Id || response.data.id,
+          Username: response.data.Username || response.data.username
+        });
+      } else {
+        return res.status(404).json({
+          error: 'User not found'
+        });
+      }
+    } catch (error) {
+      console.error(`Error searching username ${username}:`, error.message);
+      
+      // Username search might not be supported by pekora.zip
+      return res.status(501).json({
+        error: 'Username search not supported by API'
       });
     }
   });
