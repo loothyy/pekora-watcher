@@ -45,7 +45,7 @@ async function checkAccount(id) {
     const response = await axios.get(`${API_BASE_URL}${id}`, {
       timeout: REQUEST_TIMEOUT,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; PekoraWatcher/1.0)'
+        'User -Agent': 'Mozilla/5.0 (compatible; PekoraWatcher/1.0)'
       },
       validateStatus: function (status) {
         return status === 200 || status === 404 || status === 401 || status === 400;
@@ -235,7 +235,7 @@ function setupExpressServer() {
       const response = await axios.get(`https://www.pekora.zip/users/${userId}/profile`, {
         timeout: REQUEST_TIMEOUT,
         headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; PekoraWatcher/1.0)'
+          'User -Agent': 'Mozilla/5.0 (compatible; PekoraWatcher/1.0)'
         },
         validateStatus: function (status) {
           return status === 200 || status === 404;
@@ -246,41 +246,41 @@ function setupExpressServer() {
         const html = response.data;
         
         // Extract username from the page - handle icons and extra spaces
-        const usernameMatch = html.match(/<h2[^>]*username[^>]*>([^<]*)/);
+        const usernameMatch = html.match(/<h2[^>]*username[^>]*>([^<]*?)(?=\s*<span|<div)/i);
         let username = 'Unknown';
         if (usernameMatch) {
           username = usernameMatch[1].trim();
         }
         
         // Extract user status
-        const statusMatch = html.match(/<p[^>]*userStatus[^>]*>"([^"]*)"<\/p>/);
+        const statusMatch = html.match(/<p[^>]*userStatus[^>]*>"([^"]*)"<\/p>/i);
         const status = statusMatch ? statusMatch[1] : '';
         
         // Extract description/about - handle multiline
-        const descMatch = html.match(/<p[^>]*body[^>]*>([\s\S]*?)<\/p>/);
+        const descMatch = html.match(/<p[^>]*body[^>]*>([\s\S]*?)<\/p>/i);
         let description = '';
         if (descMatch) {
           description = descMatch[1].replace(/<[^>]*>/g, '').trim();
         }
         
-        // Extract Friends - find the number after "Friends</div>"
-        const friendsMatch = html.match(/Friends<\/div>[\s\S]{0,200}?>([^<]+)<\/h3>/);
+        // Extract Friends - improved to skip to <h3>
+        const friendsMatch = html.match(/Friends<\/div>[\s\S]*?<h3[^>]*>([^<]+)<\/h3>/i);
         const friends = friendsMatch ? friendsMatch[1].trim() : '0';
         
-        // Extract Followers
-        const followersMatch = html.match(/Followers<\/div>[\s\S]{0,200}?>([^<]+)<\/h3>/);
+        // Extract Followers - improved
+        const followersMatch = html.match(/Followers<\/div>[\s\S]*?<h3[^>]*>([^<]+)<\/h3>/i);
         const followers = followersMatch ? followersMatch[1].trim() : '0';
         
-        // Extract Following
-        const followingMatch = html.match(/Following<\/div>[\s\S]{0,200}?>([^<]+)<\/h3>/);
+        // Extract Following - improved
+        const followingMatch = html.match(/Following<\/div>[\s\S]*?<h3[^>]*>([^<]+)<\/h3>/i);
         const following = followingMatch ? followingMatch[1].trim() : '0';
         
-        // Extract RAP
-        const rapMatch = html.match(/RAP<\/div>[\s\S]{0,200}?>([^<]+)<\/h3>/);
+        // Extract RAP - improved
+        const rapMatch = html.match(/RAP<\/div>[\s\S]*?<h3[^>]*>([^<]+)<\/h3>/i);
         const rap = rapMatch ? rapMatch[1].trim() : '0';
         
-        // Extract place visits from Statistics section
-        const visitsMatch = html.match(/Place Visits<\/p>[\s\S]{0,100}?<p[^>]*>([^<]+)<\/p>/);
+        // Extract place visits from Statistics section - adjusted for structure
+        const visitsMatch = html.match(/Place Visits<\/p>[\s\S]*?<p[^>]*value[^>]*>([^<]+)<\/p>/i);
         const placeVisits = visitsMatch ? visitsMatch[1].trim() : '0';
         
         console.log('Scraped data:', { username, friends, followers, following, rap, placeVisits });
@@ -331,7 +331,7 @@ function setupExpressServer() {
       const response = await axios.get(`https://www.pekora.zip/users/get-by-username/${username}`, {
         timeout: REQUEST_TIMEOUT,
         headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; PekoraWatcher/1.0)'
+          'User -Agent': 'Mozilla/5.0 (compatible; PekoraWatcher/1.0)'
         },
         validateStatus: function (status) {
           return status === 200 || status === 404 || status === 401 || status === 400;
@@ -345,7 +345,7 @@ function setupExpressServer() {
         });
       } else {
         return res.status(404).json({
-          error: 'User not found'
+          error: 'User  not found'
         });
       }
     } catch (error) {
@@ -358,7 +358,7 @@ function setupExpressServer() {
         }, {
           timeout: REQUEST_TIMEOUT,
           headers: {
-            'User-Agent': 'Mozilla/5.0 (compatible; PekoraWatcher/1.0)',
+            'User -Agent': 'Mozilla/5.0 (compatible; PekoraWatcher/1.0)',
             'Content-Type': 'application/json'
           },
           validateStatus: function (status) {
