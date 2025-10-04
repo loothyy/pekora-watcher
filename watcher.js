@@ -220,7 +220,7 @@ function setupExpressServer() {
     });
   });
 
-  // Proxy endpoint for user lookups by ID
+  // Proxy endpoint for user lookups by ID with extended profile data
   app.get('/users/:id', async (req, res) => {
     const userId = parseInt(req.params.id);
 
@@ -231,24 +231,53 @@ function setupExpressServer() {
     }
 
     try {
-      const response = await axios.get(`${API_BASE_URL}${userId}`, {
+      // Fetch the profile page HTML
+      const response = await axios.get(`https://www.pekora.zip/users/${userId}/profile`, {
         timeout: REQUEST_TIMEOUT,
         headers: {
           'User-Agent': 'Mozilla/5.0 (compatible; PekoraWatcher/1.0)'
         },
         validateStatus: function (status) {
-          return status === 200 || status === 404 || status === 401 || status === 400;
+          return status === 200 || status === 404;
         }
       });
 
       if (response.status === 200 && response.data) {
-        // Return the data with consistent casing
+        const html = response.data;
+        
+        // Extract username from the page
+        const usernameMatch = html.match(/<h2 class="[^"]*username[^"]*">([^<]+)/);
+        const username = usernameMatch ? usernameMatch[1].trim().replace(/<[^>]*>/g, '') : 'Unknown';
+        
+        // Extract user status (the "79% till verified" part)
+        const statusMatch = html.match(/<p class="[^"]*userStatus[^"]*">"([^"]*)"<\/p>/);
+        const status = statusMatch ? statusMatch[1] : '';
+        
+        // Extract description/about
+        const descMatch = html.match(/<p class="body[^"]*">([^<]*(?:<[^>]*>[^<]*)*?)<\/p>/);
+        const description = descMatch ? descMatch[1].replace(/<[^>]*>/g, '').trim() : '';
+        
+        // Extract stats: Friends, Followers, Following, RAP
+        const friendsMatch = html.match(/Friends<\/div>(?:.*?)<h3[^>]*>(\d+)<\/h3>/s);
+        const followersMatch = html.match(/Followers<\/div>(?:.*?)<h3[^>]*>(\d+)<\/h3>/s);
+        const followingMatch = html.match(/Following<\/div>(?:.*?)<h3[^>]*>(\d+)<\/h3>/s);
+        const rapMatch = html.match(/RAP<\/div>(?:.*?)<h3[^>]*>([^<]+)<\/h3>/s);
+        
+        // Extract place visits
+        const visitsMatch = html.match(/Place Visits<\/p><p[^>]*>(\d+)<\/p>/s);
+        
         return res.json({
-          Id: response.data.Id || response.data.id || userId,
-          Username: response.data.Username || response.data.username || 'Unknown'
+          Id: userId,
+          Username: username,
+          Status: status,
+          Description: description,
+          Friends: friendsMatch ? parseInt(friendsMatch[1]) : 0,
+          Followers: followersMatch ? parseInt(followersMatch[1]) : 0,
+          Following: followingMatch ? parseInt(followingMatch[1]) : 0,
+          RAP: rapMatch ? rapMatch[1].trim() : '0',
+          PlaceVisits: visitsMatch ? parseInt(visitsMatch[1]) : 0
         });
       } else {
-        // Account doesn't exist
         return res.status(404).json({
           error: 'Account not found'
         });
@@ -256,7 +285,7 @@ function setupExpressServer() {
     } catch (error) {
       console.error(`Error fetching user ${userId}:`, error.message);
       
-      if (error.response && (error.response.status === 404 || error.response.status === 401)) {
+      if (error.response && error.response.status === 404) {
         return res.status(404).json({
           error: 'Account not found'
         });
@@ -279,9 +308,8 @@ function setupExpressServer() {
     }
 
     try {
-      // Pekora.zip doesn't have a direct username search, so we'll need to check the API
-      // If there's a search endpoint, use it. Otherwise, return error.
-      const response = await axios.get(`https://www.pekora.zip/users/search/${username}`, {
+      // Try the search endpoint format
+      const response = await axios.get(`https://www.pekora.zip/users/get-by-username/${username}`, {
         timeout: REQUEST_TIMEOUT,
         headers: {
           'User-Agent': 'Mozilla/5.0 (compatible; PekoraWatcher/1.0)'
@@ -304,9 +332,34 @@ function setupExpressServer() {
     } catch (error) {
       console.error(`Error searching username ${username}:`, error.message);
       
-      // Username search might not be supported by pekora.zip
+      // Try alternate endpoint format
+      try {
+        const altResponse = await axios.post('https://www.pekora.zip/api/users/search', {
+          username: username
+        }, {
+          timeout: REQUEST_TIMEOUT,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; PekoraWatcher/1.0)',
+            'Content-Type': 'application/json'
+          },
+          validateStatus: function (status) {
+            return status === 200 || status === 404 || status === 401 || status === 400;
+          }
+        });
+
+        if (altResponse.status === 200 && altResponse.data) {
+          return res.json({
+            Id: altResponse.data.Id || altResponse.data.id,
+            Username: altResponse.data.Username || altResponse.data.username
+          });
+        }
+      } catch (altError) {
+        console.error(`Alternate search failed:`, altError.message);
+      }
+      
+      // Username search not supported
       return res.status(501).json({
-        error: 'Username search not supported by API'
+        error: 'Username search not currently supported. Please search by ID instead.'
       });
     }
   });
