@@ -45,7 +45,7 @@ async function checkAccount(id) {
     const response = await axios.get(`${API_BASE_URL}${id}`, {
       timeout: REQUEST_TIMEOUT,
       headers: {
-        'User -Agent': 'Mozilla/5.0 (compatible; PekoraWatcher/1.0)'
+        'User-Agent': 'Mozilla/5.0 (compatible; PekoraWatcher/1.0)'
       },
       validateStatus: function (status) {
         return status === 200 || status === 404 || status === 401 || status === 400;
@@ -235,7 +235,7 @@ function setupExpressServer() {
       const response = await axios.get(`https://www.pekora.zip/users/${userId}/profile`, {
         timeout: REQUEST_TIMEOUT,
         headers: {
-          'User -Agent': 'Mozilla/5.0 (compatible; PekoraWatcher/1.0)'
+          'User-Agent': 'Mozilla/5.0 (compatible; PekoraWatcher/1.0)'
         },
         validateStatus: function (status) {
           return status === 200 || status === 404;
@@ -349,7 +349,7 @@ function setupExpressServer() {
       const response = await axios.get(`https://www.pekora.zip/users/get-by-username/${username}`, {
         timeout: REQUEST_TIMEOUT,
         headers: {
-          'User -Agent': 'Mozilla/5.0 (compatible; PekoraWatcher/1.0)'
+          'User-Agent': 'Mozilla/5.0 (compatible; PekoraWatcher/1.0)'
         },
         validateStatus: function (status) {
           return status === 200 || status === 404 || status === 401 || status === 400;
@@ -376,7 +376,7 @@ function setupExpressServer() {
         }, {
           timeout: REQUEST_TIMEOUT,
           headers: {
-            'User -Agent': 'Mozilla/5.0 (compatible; PekoraWatcher/1.0)',
+            'User-Agent': 'Mozilla/5.0 (compatible; PekoraWatcher/1.0)',
             'Content-Type': 'application/json'
           },
           validateStatus: function (status) {
