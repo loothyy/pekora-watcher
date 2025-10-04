@@ -1,26 +1,25 @@
 /*
- * Pekora.zip Account Watcher
+ * Pekora.zip Account Watcher with User Lookup Proxy
  * 
- * This script continuously monitors the Pekora.zip API for new user accounts.
+ * This script continuously monitors the Pekora.zip API for new user accounts
+ * and provides a proxy endpoint for user lookups.
  * 
  * INSTALLATION:
- * npm install axios express
+ * npm install axios express cors
  * 
  * USAGE:
  * node watcher.js
  * 
- * FEATURES:
- * - Binary search to find the latest account ID (1 to 5,000,000)
- * - Continuous polling for new accounts (checks next 10 IDs every second)
- * - Persistent caching in latest_account_cache.json
- * - Express API endpoint at /latest to retrieve current latest account
- * - Graceful error handling and automatic retries
+ * ENDPOINTS:
+ * - GET /latest - Get the latest account
+ * - GET /users/:id - Proxy to pekora.zip user lookup
+ * - GET /health - Health check
  */
 
 const axios = require('axios');
 const express = require('express');
+const cors = require('cors');
 const fs = require('fs');
-const path = require('path');
 
 // Configuration constants
 const API_BASE_URL = 'https://www.pekora.zip/users/';
@@ -30,7 +29,7 @@ const MAX_ID = 5000000;
 const POLLING_INTERVAL = 1000; // 1 second
 const IDS_TO_CHECK = 10; // Check next 10 IDs
 const REQUEST_TIMEOUT = 5000; // 5 seconds timeout for API requests
-const EXPRESS_PORT = 5000;
+const EXPRESS_PORT = process.env.PORT || 5000;
 
 // Global state
 let latestAccount = null;
@@ -65,7 +64,6 @@ async function checkAccount(id) {
     if (error.response && (error.response.status === 404 || error.response.status === 401 || error.response.status === 400)) {
       return null;
     }
-    // Log network errors but don't crash
     console.error(`Error checking ID ${id}: ${error.message}`);
     return null;
   }
@@ -73,9 +71,6 @@ async function checkAccount(id) {
 
 /**
  * Performs binary search to find the latest account ID
- * @param {number} low - Lower bound of search range
- * @param {number} high - Upper bound of search range
- * @returns {Promise<number>} - The latest account ID found
  */
 async function binarySearchLatest(low, high) {
   console.log('Starting binary search for latest account...');
@@ -88,12 +83,10 @@ async function binarySearchLatest(low, high) {
     const account = await checkAccount(mid);
 
     if (account) {
-      // Account exists, search higher
       latestFound = mid;
       console.log(`✓ Found account at ID ${mid}: ${account.username}`);
       low = mid + 1;
     } else {
-      // Account doesn't exist, search lower
       high = mid - 1;
     }
   }
@@ -104,7 +97,6 @@ async function binarySearchLatest(low, high) {
 
 /**
  * Loads the cached latest account from file
- * @returns {Object|null} - Cached account data or null if not found
  */
 function loadCache() {
   try {
@@ -122,7 +114,6 @@ function loadCache() {
 
 /**
  * Saves the latest account to cache file
- * @param {Object} account - Account data to save
  */
 function saveCache(account) {
   try {
@@ -144,9 +135,7 @@ async function continuousPolling() {
   console.log(`\nStarting continuous polling from ID ${latestAccount.id + 1}...`);
   console.log(`Checking next ${IDS_TO_CHECK} IDs every ${POLLING_INTERVAL}ms\n`);
 
-  // Use async while loop instead of setInterval to prevent overlapping requests
   while (true) {
-    // Check the next 10 IDs after the current latest
     const startId = latestAccount.id + 1;
     const endId = startId + IDS_TO_CHECK - 1;
 
@@ -154,17 +143,14 @@ async function continuousPolling() {
       const account = await checkAccount(id);
 
       if (account) {
-        // New account found!
         console.log(`\n🎉 NEW ACCOUNT FOUND! ID: ${account.id}, Username: ${account.username}`);
         latestAccount = account;
         saveCache(account);
       }
       
-      // Add a small delay between requests to avoid rate limiting (100ms per request)
       await new Promise(resolve => setTimeout(resolve, 100));
     }
     
-    // Wait for the polling interval before the next batch
     await new Promise(resolve => setTimeout(resolve, POLLING_INTERVAL));
   }
 }
@@ -175,14 +161,12 @@ async function continuousPolling() {
 async function initializeWatcher() {
   console.log('=== Pekora.zip Account Watcher Started ===\n');
 
-  // Try to load from cache first
   const cached = loadCache();
 
   if (cached) {
     console.log('Using cached latest account as starting point.');
     latestAccount = cached;
     
-    // Verify the cached account still exists
     console.log('Verifying cached account...');
     const verified = await checkAccount(cached.id);
     if (!verified) {
@@ -191,7 +175,6 @@ async function initializeWatcher() {
     }
   }
 
-  // If no cache or verification failed, do binary search
   if (!latestAccount) {
     isSearching = true;
     const latestId = await binarySearchLatest(MIN_ID, MAX_ID);
@@ -203,22 +186,23 @@ async function initializeWatcher() {
       console.log(`\nInitial latest account: ID ${account.id}, Username: ${account.username}\n`);
     } else {
       console.error('Failed to find any accounts. Will retry...');
-      // Retry after a delay
       setTimeout(initializeWatcher, 5000);
       return;
     }
     isSearching = false;
   }
 
-  // Start continuous polling
   continuousPolling();
 }
 
 /**
- * Sets up Express server with API endpoint
+ * Sets up Express server with API endpoints
  */
 function setupExpressServer() {
   const app = express();
+  
+  // Enable CORS for all routes
+  app.use(cors());
 
   // Endpoint to get the latest account
   app.get('/latest', (req, res) => {
@@ -236,6 +220,54 @@ function setupExpressServer() {
     });
   });
 
+  // Proxy endpoint for user lookups
+  app.get('/users/:id', async (req, res) => {
+    const userId = parseInt(req.params.id);
+
+    if (isNaN(userId) || userId < 1) {
+      return res.status(400).json({
+        error: 'Invalid user ID'
+      });
+    }
+
+    try {
+      const response = await axios.get(`${API_BASE_URL}${userId}`, {
+        timeout: REQUEST_TIMEOUT,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; PekoraWatcher/1.0)'
+        },
+        validateStatus: function (status) {
+          return status === 200 || status === 404 || status === 401 || status === 400;
+        }
+      });
+
+      if (response.status === 200 && response.data) {
+        // Return the data with consistent casing
+        return res.json({
+          Id: response.data.Id || response.data.id || userId,
+          Username: response.data.Username || response.data.username || 'Unknown'
+        });
+      } else {
+        // Account doesn't exist
+        return res.status(404).json({
+          error: 'Account not found'
+        });
+      }
+    } catch (error) {
+      console.error(`Error fetching user ${userId}:`, error.message);
+      
+      if (error.response && (error.response.status === 404 || error.response.status === 401)) {
+        return res.status(404).json({
+          error: 'Account not found'
+        });
+      }
+      
+      return res.status(500).json({
+        error: 'Failed to fetch user data'
+      });
+    }
+  });
+
   // Health check endpoint
   app.get('/health', (req, res) => {
     res.json({
@@ -251,6 +283,7 @@ function setupExpressServer() {
       name: 'Pekora.zip Account Watcher',
       endpoints: {
         '/latest': 'Get the latest account information',
+        '/users/:id': 'Get user information by ID (proxy to pekora.zip)',
         '/health': 'Check watcher status'
       },
       currentLatest: latestAccount ? {
@@ -262,7 +295,10 @@ function setupExpressServer() {
 
   app.listen(EXPRESS_PORT, '0.0.0.0', () => {
     console.log(`Express API server listening on http://0.0.0.0:${EXPRESS_PORT}`);
-    console.log(`Access /latest endpoint to get current latest account\n`);
+    console.log(`Endpoints available:`);
+    console.log(`  - GET /latest - Get latest account`);
+    console.log(`  - GET /users/:id - Lookup user by ID`);
+    console.log(`  - GET /health - Health check\n`);
   });
 }
 
@@ -270,15 +306,12 @@ function setupExpressServer() {
  * Main entry point
  */
 async function main() {
-  // Set up the Express server first
   setupExpressServer();
 
-  // Initialize the watcher and start monitoring
   try {
     await initializeWatcher();
   } catch (error) {
     console.error('Fatal error in watcher:', error);
-    // Retry initialization after a delay
     setTimeout(main, 10000);
   }
 }
