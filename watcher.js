@@ -247,35 +247,35 @@ function setupExpressServer() {
         
         // Extract username from the page
         const usernameMatch = html.match(/<h2 class="[^"]*username[^"]*">([^<]+)/);
-        const username = usernameMatch ? usernameMatch[1].trim().replace(/<[^>]*>/g, '') : 'Unknown';
+        const username = usernameMatch ? usernameMatch[1].trim().replace(/<[^>]*>/g, '').replace(/\s+/g, ' ') : 'Unknown';
         
-        // Extract user status (the "79% till verified" part)
+        // Extract user status (the "79% till verified" part or other status)
         const statusMatch = html.match(/<p class="[^"]*userStatus[^"]*">"([^"]*)"<\/p>/);
         const status = statusMatch ? statusMatch[1] : '';
         
         // Extract description/about
-        const descMatch = html.match(/<p class="body[^"]*">([^<]*(?:<[^>]*>[^<]*)*?)<\/p>/);
+        const descMatch = html.match(/<p class="body[^"]*">([^]*?)<\/p>/);
         const description = descMatch ? descMatch[1].replace(/<[^>]*>/g, '').trim() : '';
         
-        // Extract stats: Friends, Followers, Following, RAP
-        const friendsMatch = html.match(/Friends<\/div>(?:.*?)<h3[^>]*>(\d+)<\/h3>/s);
-        const followersMatch = html.match(/Followers<\/div>(?:.*?)<h3[^>]*>(\d+)<\/h3>/s);
-        const followingMatch = html.match(/Following<\/div>(?:.*?)<h3[^>]*>(\d+)<\/h3>/s);
-        const rapMatch = html.match(/RAP<\/div>(?:.*?)<h3[^>]*>([^<]+)<\/h3>/s);
+        // Extract stats: Friends, Followers, Following, RAP - look for statText class
+        const friendsMatch = html.match(/Friends<\/div>[\s\S]*?<h3[^>]*statText[^>]*>(\d+[K+]*)<\/h3>/);
+        const followersMatch = html.match(/Followers<\/div>[\s\S]*?<h3[^>]*statText[^>]*>([^<]+)<\/h3>/);
+        const followingMatch = html.match(/Following<\/div>[\s\S]*?<h3[^>]*statText[^>]*>(\d+[K+]*)<\/h3>/);
+        const rapMatch = html.match(/RAP<\/div>[\s\S]*?<h3[^>]*statText[^>]*>([^<]+)<\/h3>/);
         
-        // Extract place visits
-        const visitsMatch = html.match(/Place Visits<\/p><p[^>]*>(\d+)<\/p>/s);
+        // Extract place visits - look in Statistics section
+        const visitsMatch = html.match(/Place Visits<\/p>[\s\S]*?<p[^>]*value[^>]*>(\d+[K+]*)<\/p>/);
         
         return res.json({
           Id: userId,
           Username: username,
           Status: status,
           Description: description,
-          Friends: friendsMatch ? parseInt(friendsMatch[1]) : 0,
-          Followers: followersMatch ? parseInt(followersMatch[1]) : 0,
-          Following: followingMatch ? parseInt(followingMatch[1]) : 0,
+          Friends: friendsMatch ? friendsMatch[1] : '0',
+          Followers: followersMatch ? followersMatch[1].trim() : '0',
+          Following: followingMatch ? followingMatch[1] : '0',
           RAP: rapMatch ? rapMatch[1].trim() : '0',
-          PlaceVisits: visitsMatch ? parseInt(visitsMatch[1]) : 0
+          PlaceVisits: visitsMatch ? visitsMatch[1] : '0'
         });
       } else {
         return res.status(404).json({
