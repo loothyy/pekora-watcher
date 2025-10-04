@@ -245,37 +245,56 @@ function setupExpressServer() {
       if (response.status === 200 && response.data) {
         const html = response.data;
         
-        // Extract username from the page
-        const usernameMatch = html.match(/<h2 class="[^"]*username[^"]*">([^<]+)/);
-        const username = usernameMatch ? usernameMatch[1].trim().replace(/<[^>]*>/g, '').replace(/\s+/g, ' ') : 'Unknown';
+        // Extract username from the page - handle icons and extra spaces
+        const usernameMatch = html.match(/<h2[^>]*username[^>]*>([^<]*)/);
+        let username = 'Unknown';
+        if (usernameMatch) {
+          username = usernameMatch[1].trim();
+        }
         
-        // Extract user status (the "79% till verified" part or other status)
-        const statusMatch = html.match(/<p class="[^"]*userStatus[^"]*">"([^"]*)"<\/p>/);
+        // Extract user status
+        const statusMatch = html.match(/<p[^>]*userStatus[^>]*>"([^"]*)"<\/p>/);
         const status = statusMatch ? statusMatch[1] : '';
         
-        // Extract description/about
-        const descMatch = html.match(/<p class="body[^"]*">([^]*?)<\/p>/);
-        const description = descMatch ? descMatch[1].replace(/<[^>]*>/g, '').trim() : '';
+        // Extract description/about - handle multiline
+        const descMatch = html.match(/<p[^>]*body[^>]*>([\s\S]*?)<\/p>/);
+        let description = '';
+        if (descMatch) {
+          description = descMatch[1].replace(/<[^>]*>/g, '').trim();
+        }
         
-        // Extract stats: Friends, Followers, Following, RAP - look for statText class
-        const friendsMatch = html.match(/Friends<\/div>[\s\S]*?<h3[^>]*statText[^>]*>(\d+[K+]*)<\/h3>/);
-        const followersMatch = html.match(/Followers<\/div>[\s\S]*?<h3[^>]*statText[^>]*>([^<]+)<\/h3>/);
-        const followingMatch = html.match(/Following<\/div>[\s\S]*?<h3[^>]*statText[^>]*>(\d+[K+]*)<\/h3>/);
-        const rapMatch = html.match(/RAP<\/div>[\s\S]*?<h3[^>]*statText[^>]*>([^<]+)<\/h3>/);
+        // Extract Friends - find the number after "Friends</div>"
+        const friendsMatch = html.match(/Friends<\/div>[\s\S]{0,200}?>([^<]+)<\/h3>/);
+        const friends = friendsMatch ? friendsMatch[1].trim() : '0';
         
-        // Extract place visits - look in Statistics section
-        const visitsMatch = html.match(/Place Visits<\/p>[\s\S]*?<p[^>]*value[^>]*>(\d+[K+]*)<\/p>/);
+        // Extract Followers
+        const followersMatch = html.match(/Followers<\/div>[\s\S]{0,200}?>([^<]+)<\/h3>/);
+        const followers = followersMatch ? followersMatch[1].trim() : '0';
+        
+        // Extract Following
+        const followingMatch = html.match(/Following<\/div>[\s\S]{0,200}?>([^<]+)<\/h3>/);
+        const following = followingMatch ? followingMatch[1].trim() : '0';
+        
+        // Extract RAP
+        const rapMatch = html.match(/RAP<\/div>[\s\S]{0,200}?>([^<]+)<\/h3>/);
+        const rap = rapMatch ? rapMatch[1].trim() : '0';
+        
+        // Extract place visits from Statistics section
+        const visitsMatch = html.match(/Place Visits<\/p>[\s\S]{0,100}?<p[^>]*>([^<]+)<\/p>/);
+        const placeVisits = visitsMatch ? visitsMatch[1].trim() : '0';
+        
+        console.log('Scraped data:', { username, friends, followers, following, rap, placeVisits });
         
         return res.json({
           Id: userId,
           Username: username,
           Status: status,
           Description: description,
-          Friends: friendsMatch ? friendsMatch[1] : '0',
-          Followers: followersMatch ? followersMatch[1].trim() : '0',
-          Following: followingMatch ? followingMatch[1] : '0',
-          RAP: rapMatch ? rapMatch[1].trim() : '0',
-          PlaceVisits: visitsMatch ? visitsMatch[1] : '0'
+          Friends: friends,
+          Followers: followers,
+          Following: following,
+          RAP: rap,
+          PlaceVisits: placeVisits
         });
       } else {
         return res.status(404).json({
