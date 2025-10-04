@@ -220,7 +220,7 @@ function setupExpressServer() {
     });
   });
 
-  // Proxy endpoint for user lookups by ID with extended profile data
+  // Proxy endpoint for user lookups by ID
   app.get('/users/:id', async (req, res) => {
     const userId = parseInt(req.params.id);
 
@@ -231,90 +231,24 @@ function setupExpressServer() {
     }
 
     try {
-      // Fetch the profile page HTML
-      const response = await axios.get(`https://www.pekora.zip/users/${userId}/profile`, {
+      const response = await axios.get(`${API_BASE_URL}${userId}`, {
         timeout: REQUEST_TIMEOUT,
         headers: {
           'User-Agent': 'Mozilla/5.0 (compatible; PekoraWatcher/1.0)'
         },
         validateStatus: function (status) {
-          return status === 200 || status === 404;
+          return status === 200 || status === 404 || status === 401 || status === 400;
         }
       });
 
       if (response.status === 200 && response.data) {
-        const html = response.data;
-        
-        // Extract username from the page - handle icons and extra spaces
-        let username = 'Unknown';
-        const usernameMatch = html.match(/<h2\s+class="username[^"]*"[^>]*>([^<]+?)(?=\s*<span|<div|<p)/i);
-        if (usernameMatch) {
-          username = usernameMatch[1].trim().replace(/\s+/g, ' ');
-        }
-        
-        // Extract user status
-        let status = '';
-        const statusMatch = html.match(/<p\s+class="userStatus[^"]*"[^>]*>(["']?)(.*?)\1<\/p>/i);
-        if (statusMatch) {
-          status = statusMatch[2].trim().replace(/^["']|["']$/g, '');
-        }
-        
-        // Extract description/about - handle multiline
-        let description = '';
-        const descMatch = html.match(/<p\s+class="body[^"]*"[^>]*>([\s\S]*?)<\/p>/i);
-        if (descMatch) {
-          description = descMatch[1].replace(/<[^>]*>/g, '').trim();
-        }
-        
-        // Extract Friends - find the number after "Friends</div>"
-        let friends = '0';
-        const friendsMatch = html.match(/Friends<\/div>[\s\S]*?<h3\s+class="statText[^"]*"[^>]*>([^<]+)<\/h3>/i);
-        if (friendsMatch) {
-          friends = friendsMatch[1].trim();
-        }
-        
-        // Extract Followers
-        let followers = '0';
-        const followersMatch = html.match(/Followers<\/div>[\s\S]*?<h3\s+class="statText[^"]*"[^>]*>([^<]+)<\/h3>/i);
-        if (followersMatch) {
-          followers = followersMatch[1].trim();
-        }
-        
-        // Extract Following
-        let following = '0';
-        const followingMatch = html.match(/Following<\/div>[\s\S]*?<h3\s+class="statText[^"]*"[^>]*>([^<]+)<\/h3>/i);
-        if (followingMatch) {
-          following = followingMatch[1].trim();
-        }
-        
-        // Extract RAP
-        let rap = '0';
-        const rapMatch = html.match(/RAP<\/div>[\s\S]*?<h3\s+class="statText[^"]*"[^>]*>([^<]+)<\/h3>/i);
-        if (rapMatch) {
-          rap = rapMatch[1].trim();
-        }
-        
-        // Extract place visits from Statistics section
-        let placeVisits = '0';
-        const visitsMatch = html.match(/Place\s+Visits<\/p>[\s\S]*?<p\s+class="value[^"]*"[^>]*>([^<]+)<\/p>/i);
-        if (visitsMatch) {
-          placeVisits = visitsMatch[1].trim();
-        }
-        
-        console.log('Scraped data:', { username, status, description, friends, followers, following, rap, placeVisits });
-        
+        // Return the data with consistent casing
         return res.json({
-          Id: userId,
-          Username: username,
-          Status: status,
-          Description: description,
-          Friends: friends,
-          Followers: followers,
-          Following: following,
-          RAP: rap,
-          PlaceVisits: placeVisits
+          Id: response.data.Id || response.data.id || userId,
+          Username: response.data.Username || response.data.username || 'Unknown'
         });
       } else {
+        // Account doesn't exist
         return res.status(404).json({
           error: 'Account not found'
         });
@@ -322,7 +256,7 @@ function setupExpressServer() {
     } catch (error) {
       console.error(`Error fetching user ${userId}:`, error.message);
       
-      if (error.response && error.response.status === 404) {
+      if (error.response && (error.response.status === 404 || error.response.status === 401)) {
         return res.status(404).json({
           error: 'Account not found'
         });
@@ -363,7 +297,7 @@ function setupExpressServer() {
         });
       } else {
         return res.status(404).json({
-          error: 'User  not found'
+          error: 'User not found'
         });
       }
     } catch (error) {
